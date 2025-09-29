@@ -1,0 +1,4 @@
+body { font-family: Arial, sans-serif; margin: 20px; }
+#clips-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.clip { border: 2px solid #ccc; padding: 5px; width: 30%; cursor: pointer; }
+.clip.selected { border-color: green; }

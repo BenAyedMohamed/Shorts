@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pexels Video Fetcher</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f9f9f9;
+    color: #333;
+  }
+
+  h1, h2, h3 {
+    color: #222;
+  }
+
+  input, button, select, textarea {
+    margin: 5px 0;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0,123,255,0.3);
+  }
+
+  button {
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    border: none;
+  }
+
+  button:hover {
+    background-color: #0056b3;
+  }
+
+  .keyword-section {
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  }
+
+  .video-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 10px;
+  }
+
+  .video-container {
+    flex: 1 1 calc(33.33% - 12px);
+    position: relative;
+    border: 1px solid #ddd;
+    padding: 5px;
+    border-radius: 8px;
+    background-color: #fafafa;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .video-container video {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    border-radius: 5px;
+    margin-bottom: 8px;
+  }
+
+  .clip-settings {
+    margin-top: 5px;
+    font-size: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .clip-settings label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .reload-btn {
+    margin-top: 10px;
+    background-color: #28a745;
+  }
+
+  .reload-btn:hover {
+    background-color: #1e7e34;
+  }
+
+  #ttsContainer {
+    margin-top: 25px;
+    border: 1px solid #888;
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #fff;
+  }
+
+  #mergeBtn {
+    margin-top: 20px;
+    background-color: #ffc107;
+    color: #333;
+  }
+
+  #mergeBtn:hover {
+    background-color: #e0a800;
+  }
+
+  #selectedClipsContainer div {
+    margin-bottom: 5px;
+    padding: 5px 8px;
+    border-left: 3px solid #007bff;
+    background-color: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  textarea {
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+
+<h1>Pexels Video Fetcher</h1>
+
+<label>Enter Keyword:</label><br>
+<input type="text" id="keywordInput" placeholder="Type a keyword">
+<select id="videoLayout">
+  <option value="shorts">YouTube Short (9:16)</option>
+  <option value="landscape">Normal Video (16:9)</option>
+</select>
+<button id="addKeywordBtn">Add Keyword</button>
+
+<div id="keywordsContainer"></div>
+
+<h2>Selected Clips for Final Video</h2>
+<div id="selectedClipsContainer"></div>
+
+<!-- TTS Section -->
+<div id="ttsContainer">
+  <h2>Text-to-Speech</h2>
+  <textarea id="ttsText" placeholder="Enter text to convert to speech" rows="4" cols="50"></textarea><br>
+  <label>Choose Voice:</label>
+  <select id="ttsVoice">
+    <option value="mysterious">Mysterious</option>
+    <option value="dark">Dark</option>
+    <option value="cheerful">Cheerful</option>
+    <option value="manly">Manly</option>
+    <option value="feminine">Feminine</option>
+  </select>
+  <button id="generateTTSBtn">Generate TTS</button>
+  <p id="ttsLength"></p>
+</div>
+
+<button id="mergeBtn">Merge Clips (Send to Backend)</button>
+
+<script>
+const PEXELS_API_KEY = "WKDE0gDSBuanzOlPWU8ZLbe0PvkFVxhxzvDLV7WJ8g8e8o4dXKYbbPgc";
+const keywordsContainer = document.getElementById('keywordsContainer');
+const selectedClipsContainer = document.getElementById('selectedClipsContainer');
+
+let keywordsData = {}; 
+let selectedClips = []; 
+let ttsAudioPath = null;
+let ttsText = "";
+let ttsWordTimings = []; 
+
+function fetchVideos(keyword) {
+  const perPage = 6;
+  const page = Math.floor(Math.random() * 10) + 1; 
+  const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(keyword)}&per_page=${perPage}&page=${page}`;
+  
+  return fetch(url, {
+    headers: { Authorization: PEXELS_API_KEY }
+  })
+  .then(res => res.json())
+  .then(data => {
+    return data.videos.map(video => video.video_files[0].link);
+  })
+  .catch(err => {
+    console.error(err);
+    return [];
+  });
+}
+
+function renderKeywordSection(keyword) {
+  const section = document.createElement('div');
+  section.className = 'keyword-section';
+  section.id = `section-${keyword}`;
+  
+  const title = document.createElement('h3');
+  title.textContent = `Keyword: ${keyword}`;
+  
+  const reloadBtn = document.createElement('button');
+  reloadBtn.textContent = 'Reload Videos';
+  reloadBtn.className = 'reload-btn';
+  reloadBtn.onclick = () => loadVideos(keyword, true);
+
+  const videoGrid = document.createElement('div');
+  videoGrid.className = 'video-grid';
+  videoGrid.id = `grid-${keyword}`;
+
+  section.appendChild(title);
+  section.appendChild(reloadBtn);
+  section.appendChild(videoGrid);
+  keywordsContainer.appendChild(section);
+}
+
+function loadVideos(keyword, forceReload=false) {
+  const videoGrid = document.getElementById(`grid-${keyword}`);
+  videoGrid.innerHTML = 'Loading videos...';
+  
+  if (!forceReload && keywordsData[keyword]) {
+    displayVideos(keyword, keywordsData[keyword]);
+    return;
+  }
+
+  fetchVideos(keyword).then(videos => {
+    if (videos.length === 0) {
+      videoGrid.innerHTML = '<p>No videos found.</p>';
+      return;
+    }
+    keywordsData[keyword] = videos;
+    displayVideos(keyword, videos);
+  });
+}
+
+function displayVideos(keyword, videos) {
+  const videoGrid = document.getElementById(`grid-${keyword}`);
+  videoGrid.innerHTML = '';
+  const layout = document.getElementById('videoLayout').value;
+  
+  videos.forEach(link => {
+    const container = document.createElement('div');
+    container.className = 'video-container';
+    
+    const video = document.createElement('video');
+    video.src = link;
+    video.controls = true;
+    video.style.aspectRatio = layout === 'shorts' ? '9/16' : '16/9';
+    
+    const settingsDiv = document.createElement('div');
+    settingsDiv.className = 'clip-settings';
+    settingsDiv.innerHTML = `
+      <label>Start sec: <input type="number" min="0" value="0" step="0.1" class="startSec"></label>
+      <label>End sec: <input type="number" min="0" value="5" step="0.1" class="endSec"></label>
+      <label>Timeline start: <input type="number" min="0" value="0" step="0.1" class="timelineStart"></label>
+      <button class="addClipBtn">Add to Final</button>
+    `;
+
+    settingsDiv.querySelector('.addClipBtn').onclick = () => {
+      const start = parseFloat(settingsDiv.querySelector('.startSec').value);
+      const end = parseFloat(settingsDiv.querySelector('.endSec').value);
+      const timelineStart = parseFloat(settingsDiv.querySelector('.timelineStart').value);
+      selectedClips.push({link, keyword, start, end, timelineStart});
+      renderSelectedClips();
+    };
+
+    container.appendChild(video);
+    container.appendChild(settingsDiv);
+    videoGrid.appendChild(container);
+  });
+}
+
+function renderSelectedClips() {
+  selectedClipsContainer.innerHTML = '';
+  selectedClips.forEach((clip, index) => {
+    const div = document.createElement('div');
+    div.textContent = `${index+1}. ${clip.keyword} | Start: ${clip.start}s End: ${clip.end}s Timeline: ${clip.timelineStart}s`;
+    selectedClipsContainer.appendChild(div);
+  });
+}
+
+document.getElementById('addKeywordBtn').addEventListener('click', () => {
+  const keywordInput = document.getElementById('keywordInput');
+  const keyword = keywordInput.value.trim();
+  if (!keyword) return;
+  
+  if (!document.getElementById(`section-${keyword}`)) {
+    renderKeywordSection(keyword);
+  }
+  loadVideos(keyword, true);
+  keywordInput.value = '';
+});
+
+// Generate TTS
+document.getElementById('generateTTSBtn').addEventListener('click', () => {
+  ttsText = document.getElementById('ttsText').value.trim();
+  const voice = document.getElementById('ttsVoice').value;
+
+  if (!ttsText) {
+    alert("Please enter text for TTS.");
+    return;
+  }
+
+  fetch('http://localhost:8000/generate_tts/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: ttsText, voice })
+  })
+  .then(res => res.json())
+  .then(data => {
+    ttsAudioPath = data.audio_path;
+    ttsWordTimings = data.word_timings || [];
+    document.getElementById('ttsLength').textContent = `Audio length: ${data.length.toFixed(2)} sec`;
+    alert("TTS generated! You can now merge clips with subtitles.");
+  })
+  .catch(err => alert('Error generating TTS: ' + err));
+});
+
+// Merge Clips
+document.getElementById('mergeBtn').addEventListener('click', () => {
+  fetch('http://localhost:8000/merge_clips/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        clips: selectedClips,
+        layout: document.getElementById('videoLayout').value,
+        tts_path: ttsAudioPath,
+        subtitles: ttsText,
+        word_timings: ttsWordTimings
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.merged_video_path) {
+      alert('Merge finished! Output: ' + data.merged_video_path);
+    } else {
+      alert('Merge finished but output path undefined!');
+    }
+  })
+  .catch(err => alert('Error: ' + err));
+});
+</script>
+
+</body>
+</html>
