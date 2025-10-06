@@ -9,7 +9,9 @@ from gtts import gTTS
 # -----------------------------
 # CONFIG
 # -----------------------------
-PEXELS_API_KEY = "WKDE0gDSBuanzOlPWU8ZLbe0PvkFVxhxzvDLV7WJ8g8e8o4dXKYbbPgc"
+import os
+
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
 HEADERS = {"Authorization": PEXELS_API_KEY}
 TEMP_DIR = "temp_videos"
 FINAL_DIR = "final_videos"
